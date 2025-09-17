@@ -34,6 +34,7 @@ func NewIRGen() *IRGen {
 func (ir *IRGen) GenerateFunctions(f *ast.FuncStmt) {
 	funcType := C.LLVMFunctionType(C.LLVMInt32Type(), nil, 0, 0)
 	funcRef := C.LLVMAddFunction(ir.mod, C.CString(f.Name), funcType)
+	C.LLVMSetLinkage(funcRef, C.LLVMLinkage(C.LLVMExternalLinkage)) // ← 使用新版枚举
 	entry := C.LLVMAppendBasicBlock(funcRef, C.CString("entry"))
 	C.LLVMPositionBuilderAtEnd(ir.builder, entry)
 
@@ -71,7 +72,6 @@ func (ir *IRGen) printInt(val C.LLVMValueRef) {
 	fmt.Println("Printing integer (LLVM IR value):", val)
 }
 
-// WriteObject 写出 .oo 文件
 func (ir *IRGen) WriteObject(filename string) {
 	cfilename := C.CString(filename)
 	defer C.free(unsafe.Pointer(cfilename))
@@ -80,10 +80,33 @@ func (ir *IRGen) WriteObject(filename string) {
 	}
 }
 
-// Link 链接多个 .oo 文件生成可执行程序
 func Link(objects []string, exeName string) error {
-	args := append(objects, "-o", exeName)
-	fmt.Println("Linking using clang:", args)
+	tmpC := "main_wrapper.c"
+	cfile, err := os.Create(tmpC)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmpC)
+
+	cfile.WriteString(`
+extern int entrance();
+int main() { return entrance(); }
+`)
+	cfile.Close()
+
+	objFiles := []string{}
+	for _, bc := range objects {
+		oFile := bc[:len(bc)-3] + ".o"
+		cmd := exec.Command("llc", "-filetype=obj", bc, "-o", oFile)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+		objFiles = append(objFiles, oFile)
+	}
+
+	args := append(objFiles, tmpC, "-o", exeName)
 	cmd := exec.Command("clang", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

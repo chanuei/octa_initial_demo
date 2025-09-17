@@ -1,23 +1,20 @@
 package lexer
 
-import (
-	"fmt"
-	"unicode"
-)
+import "strings"
 
 type TokenType int
 
 const (
 	TokenEOF TokenType = iota
-	TokenIdentifier
-	TokenNumber
-	TokenVar
-	TokenPrint
 	TokenBlock
-	TokenAssign // =
-	TokenLParen // (
-	TokenRParen // )
-	TokenEOL
+	TokenVar
+	TokenAssign
+	TokenPrint
+	TokenNumber
+	TokenIdent
+	TokenLParen
+	TokenRParen
+	TokenNewline
 )
 
 type Token struct {
@@ -25,70 +22,28 @@ type Token struct {
 	Value string
 }
 
-type Lexer struct {
-	input []rune
-	pos   int
-}
-
-func New(input string) *Lexer {
-	return &Lexer{input: []rune(input)}
-}
-
-func (l *Lexer) Next() Token {
-	l.skipWhitespace()
-
-	if l.pos >= len(l.input) {
-		return Token{Type: TokenEOF}
-	}
-
-	ch := l.input[l.pos]
-
-	// 标识符/关键字
-	if unicode.IsLetter(ch) {
-		start := l.pos
-		for l.pos < len(l.input) && (unicode.IsLetter(l.input[l.pos]) || unicode.IsDigit(l.input[l.pos])) {
-			l.pos++
+// 简单分词
+func Lex(input string) []Token {
+	var tokens []Token
+	lines := strings.Split(input, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
 		}
-		word := string(l.input[start:l.pos])
-		switch word {
-		case "var":
-			return Token{Type: TokenVar, Value: word}
-		case "print":
-			return Token{Type: TokenPrint, Value: word}
-		case "block":
-			return Token{Type: TokenBlock, Value: word}
-		default:
-			return Token{Type: TokenIdentifier, Value: word}
+		words := strings.Fields(line)
+		for _, w := range words {
+			switch w {
+			case "block":
+				tokens = append(tokens, Token{Type: TokenBlock, Value: w})
+			case "var":
+				tokens = append(tokens, Token{Type: TokenVar, Value: w})
+			case "print":
+				tokens = append(tokens, Token{Type: TokenPrint, Value: w})
+			default:
+				tokens = append(tokens, Token{Type: TokenIdent, Value: w})
+			}
 		}
 	}
-
-	// 数字
-	if unicode.IsDigit(ch) {
-		start := l.pos
-		for l.pos < len(l.input) && unicode.IsDigit(l.input[l.pos]) {
-			l.pos++
-		}
-		return Token{Type: TokenNumber, Value: string(l.input[start:l.pos])}
-	}
-
-	// 符号
-	l.pos++
-	switch ch {
-	case '=':
-		return Token{Type: TokenAssign, Value: "="}
-	case '(':
-		return Token{Type: TokenLParen, Value: "("}
-	case ')':
-		return Token{Type: TokenRParen, Value: ")"}
-	case '\n':
-		return Token{Type: TokenEOL, Value: "\n"}
-	}
-
-	panic(fmt.Sprintf("unknown char: %c", ch))
-}
-
-func (l *Lexer) skipWhitespace() {
-	for l.pos < len(l.input) && (l.input[l.pos] == ' ' || l.input[l.pos] == '\t' || l.input[l.pos] == '\r') {
-		l.pos++
-	}
+	return tokens
 }

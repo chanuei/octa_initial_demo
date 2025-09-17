@@ -3,7 +3,7 @@ package ast
 type Expr interface{}
 
 type NumberExpr struct {
-	Value int
+	Value uint64
 }
 
 type VarExpr struct {
