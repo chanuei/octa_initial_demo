@@ -44,7 +44,7 @@ func main() {
 
 			outFile := *output
 			if outFile == "" {
-				outFile = fname[:len(fname)-6] + ".oo"
+				outFile = fname[:len(fname)-5] + ".bc"
 			}
 			ir.WriteObject(outFile)
 			fmt.Printf("Compiled %s to %s\n", fname, outFile)

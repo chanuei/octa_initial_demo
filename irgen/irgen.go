@@ -59,6 +59,7 @@ func (ir *IRGen) GenerateFunctions(f *ast.FuncStmt) {
 			if !ok {
 				panic("variable not declared: " + s.Expr.(ast.VarExpr).Name)
 			}
+			fmt.Println("Preparing to print variable:", s.Expr.(ast.VarExpr).Name)
 			ptrType := C.LLVMTypeOf(ptr)
 			val := C.LLVMBuildLoad2(ir.builder, ptrType, ptr, C.CString(s.Expr.(ast.VarExpr).Name))
 			ir.printInt(val)
@@ -69,7 +70,37 @@ func (ir *IRGen) GenerateFunctions(f *ast.FuncStmt) {
 }
 
 func (ir *IRGen) printInt(val C.LLVMValueRef) {
-	fmt.Println("Printing integer (LLVM IR value):", val)
+	fmt.Printf("Printing integer (LLVM IR value): %v\n", val)
+	// 先声明 printf
+	printfParamTypes := []C.LLVMTypeRef{C.LLVMPointerType(C.LLVMInt8Type(), 0)}
+	printfType := C.LLVMFunctionType(
+		C.LLVMInt32Type(),
+		&printfParamTypes[0],
+		1, // 参数个数
+		1, // vararg
+	)
+	printf := C.LLVMGetNamedFunction(ir.mod, C.CString("printf"))
+	if printf == nil {
+		printf = C.LLVMAddFunction(ir.mod, C.CString("printf"), printfType)
+	}
+
+	formatStr := C.LLVMBuildGlobalStringPtr(
+		ir.builder,
+		C.CString("%d\n"),
+		C.CString("fmt"),
+	)
+	// 构造参数
+	args := []C.LLVMValueRef{formatStr, val}
+
+	// 正确调用
+	C.LLVMBuildCall2(
+		ir.builder,
+		printfType, // 直接用声明时保存的函数类型
+		printf,
+		&args[0],
+		C.uint(len(args)),
+		C.CString(""),
+	)
 }
 
 func (ir *IRGen) WriteObject(filename string) {
